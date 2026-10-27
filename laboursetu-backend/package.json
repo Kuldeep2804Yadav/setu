@@ -42,7 +42,7 @@
     "prisma": "^6.4.1"
   },
   "private": true,
-  "packageManager": "pnpm@9.15.4",
+  "packageManager": "yarn@pnpm@9.15.4",
   "engines": {
     "node": ">=20"
   }
