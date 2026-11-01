@@ -1,5 +1,5 @@
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
@@ -74,14 +74,14 @@ enum EmailJobStatus {
 }
 
 model Organization {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String   @db.VarChar(120)
-  slug      String   @unique @db.VarChar(120)
-  code      String   @unique @db.VarChar(30)
-  phone     String?  @db.VarChar(20)
-  address   String?  @db.VarChar(300)
-  gstin     String?  @db.VarChar(20)
-  currency  String   @default("INR") @db.VarChar(10)
+  id        String   @id @default(uuid()) @map("_id")
+  name      String
+  slug      String   @unique
+  code      String   @unique
+  phone     String?
+  address   String?
+  gstin     String?
+  currency  String   @default("INR")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -99,13 +99,13 @@ model Organization {
 }
 
 model User {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @db.Uuid
+  id             String       @id @default(uuid()) @map("_id")
+  organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  email          String       @unique @db.VarChar(150)
-  phone          String?      @db.VarChar(20)
-  passwordHash   String       @db.VarChar(255)
-  name           String       @db.VarChar(120)
+  email          String       @unique
+  phone          String?
+  passwordHash   String
+  name           String
   role           Role         @default(SUPERVISOR)
   isActive       Boolean      @default(true)
   createdAt      DateTime     @default(now())
@@ -128,44 +128,42 @@ model User {
 }
 
 model Session {
-  id             String       @id @default(uuid()) @db.Uuid
-  token          String       @unique @db.VarChar(255)
-  userId         String       @db.Uuid
+  id             String       @id @default(uuid()) @map("_id")
+  token          String       @unique
+  userId         String
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organizationId String       @db.Uuid
+  organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  ipAddress      String?      @db.VarChar(50)
-  userAgent      String?      @db.VarChar(300)
+  ipAddress      String?
+  userAgent      String?
   expiresAt      DateTime
   createdAt      DateTime     @default(now())
 
-  @@index([token])
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
 }
 
 model PasswordResetToken {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @db.Uuid
+  id        String    @id @default(uuid()) @map("_id")
+  userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String    @unique @db.VarChar(255)
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())
 
-  @@index([tokenHash])
   @@map("password_reset_tokens")
 }
 
 model Site {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @db.Uuid
+  id             String       @id @default(uuid()) @map("_id")
+  organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  code           String       @db.VarChar(30)
-  name           String       @db.VarChar(150)
-  location       String?      @db.VarChar(300)
-  clientName     String?      @db.VarChar(150)
+  code           String
+  name           String
+  location       String?
+  clientName     String?
   status         SiteStatus   @default(ACTIVE)
   archivedAt     DateTime?
   createdAt      DateTime     @default(now())
@@ -183,10 +181,10 @@ model Site {
 }
 
 model SupervisorSite {
-  id         String   @id @default(uuid()) @db.Uuid
-  siteId     String   @db.Uuid
+  id         String   @id @default(uuid()) @map("_id")
+  siteId     String
   site       Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  userId     String   @db.Uuid
+  userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignedAt DateTime @default(now())
 
@@ -197,19 +195,19 @@ model SupervisorSite {
 }
 
 model Worker {
-  id                 String             @id @default(uuid()) @db.Uuid
-  organizationId     String             @db.Uuid
+  id                 String             @id @default(uuid()) @map("_id")
+  organizationId     String
   organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  code               String             @db.VarChar(30)
-  name               String             @db.VarChar(120)
-  normalizedName     String             @db.VarChar(120)
-  mobileNumber       String?            @db.VarChar(20)
-  trade              String             @db.VarChar(60)
+  code               String
+  name               String
+  normalizedName     String
+  mobileNumber       String?
+  trade              String
   verificationStatus VerificationStatus @default(UNVERIFIED)
-  aadhaarLastFour    String?            @db.VarChar(4)
+  aadhaarLastFour    String?
   status             WorkerStatus       @default(ACTIVE)
   archivedAt         DateTime?
-  notes              String?            @db.Text
+  notes              String?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
@@ -226,15 +224,15 @@ model Worker {
 }
 
 model WorkerSiteAssignment {
-  id        String           @id @default(uuid()) @db.Uuid
-  workerId  String           @db.Uuid
+  id        String           @id @default(uuid()) @map("_id")
+  workerId  String
   worker    Worker           @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  siteId    String           @db.Uuid
+  siteId    String
   site      Site             @relation(fields: [siteId], references: [id], onDelete: Cascade)
   startDate DateTime         @default(now())
   endDate   DateTime?
   status    AssignmentStatus @default(ACTIVE)
-  notes     String?          @db.VarChar(300)
+  notes     String?
   createdAt DateTime         @default(now())
 
   @@index([workerId, status])
@@ -243,15 +241,15 @@ model WorkerSiteAssignment {
 }
 
 model WageRate {
-  id              String      @id @default(uuid()) @db.Uuid
-  workerId        String      @db.Uuid
+  id              String      @id @default(uuid()) @map("_id")
+  workerId        String
   worker          Worker      @relation(fields: [workerId], references: [id], onDelete: Cascade)
   wageType        WageType
-  rate            Decimal     @db.Decimal(10, 2)
+  rate            Float
   effectiveFrom   DateTime
   effectiveTo     DateTime?
-  notes           String?     @db.VarChar(300)
-  createdByUserId String?     @db.Uuid
+  notes           String?
+  createdByUserId String?
   createdByUser   User?       @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
   createdAt       DateTime    @default(now())
   wageEntries     WageEntry[]
@@ -261,23 +259,23 @@ model WageRate {
 }
 
 model AttendanceSubmission {
-  id                String           @id @default(uuid()) @db.Uuid
-  organizationId    String           @db.Uuid
+  id                String           @id @default(uuid()) @map("_id")
+  organizationId    String
   organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  siteId            String           @db.Uuid
+  siteId            String
   site              Site             @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  attendanceDate    DateTime         @db.Date
+  attendanceDate    DateTime
   status            SubmissionStatus @default(DRAFT)
-  submittedByUserId String?          @db.Uuid
+  submittedByUserId String?
   submittedByUser   User?            @relation("SubmittedSubmissions", fields: [submittedByUserId], references: [id], onDelete: SetNull)
   submittedAt       DateTime?
-  approvedByUserId  String?          @db.Uuid
+  approvedByUserId  String?
   approvedByUser    User?            @relation("ApprovedSubmissions", fields: [approvedByUserId], references: [id], onDelete: SetNull)
   approvedAt        DateTime?
-  rejectedByUserId  String?          @db.Uuid
+  rejectedByUserId  String?
   rejectedByUser    User?            @relation("RejectedSubmissions", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
   rejectedAt        DateTime?
-  rejectionReason   String?          @db.Text
+  rejectionReason   String?
   version           Int              @default(1)
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
@@ -291,20 +289,20 @@ model AttendanceSubmission {
 }
 
 model Attendance {
-  id             String           @id @default(uuid()) @db.Uuid
-  organizationId String           @db.Uuid
+  id             String           @id @default(uuid()) @map("_id")
+  organizationId String
   organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  submissionId   String           @db.Uuid
+  submissionId   String
   submission     AttendanceSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  workerId       String           @db.Uuid
+  workerId       String
   worker         Worker           @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  siteId         String           @db.Uuid
+  siteId         String
   site           Site             @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  attendanceDate DateTime         @db.Date
+  attendanceDate DateTime
   status         AttendanceStatus
-  hoursWorked    Decimal?         @db.Decimal(5, 2)
-  payableUnits   Decimal          @db.Decimal(5, 2)
-  notes          String?          @db.VarChar(300)
+  hoursWorked    Float?
+  payableUnits   Float
+  notes          String?
   isCorrected    Boolean          @default(false)
   version        Int              @default(1)
   createdAt      DateTime         @default(now())
@@ -321,28 +319,28 @@ model Attendance {
 }
 
 model WageEntry {
-  id               String          @id @default(uuid()) @db.Uuid
-  organizationId   String          @db.Uuid
+  id               String          @id @default(uuid()) @map("_id")
+  organizationId   String
   organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  attendanceId     String          @db.Uuid
+  attendanceId     String
   attendance       Attendance      @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
-  workerId         String          @db.Uuid
+  workerId         String
   worker           Worker          @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  siteId           String          @db.Uuid
+  siteId           String
   site             Site            @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  attendanceDate   DateTime        @db.Date
-  wageRateId       String          @db.Uuid
+  attendanceDate   DateTime
+  wageRateId       String
   wageRate         WageRate        @relation(fields: [wageRateId], references: [id], onDelete: Restrict)
   wageType         WageType
-  rate             Decimal         @db.Decimal(10, 2)
-  payableUnits     Decimal         @db.Decimal(5, 2)
-  hoursWorked      Decimal?        @db.Decimal(5, 2)
-  grossWage        Decimal         @db.Decimal(10, 2)
+  rate             Float
+  payableUnits     Float
+  hoursWorked      Float?
+  grossWage        Float
   status           WageEntryStatus @default(ACTIVE)
-  approvedByUserId String          @db.Uuid
+  approvedByUserId String
   approvedByUser   User            @relation("ApprovedWageEntries", fields: [approvedByUserId], references: [id], onDelete: Restrict)
   approvedAt       DateTime
-  correctionId     String?         @db.Uuid
+  correctionId     String?
   correction       AttendanceCorrection? @relation(fields: [correctionId], references: [id], onDelete: SetNull)
   version          Int             @default(1)
   createdAt        DateTime        @default(now())
@@ -356,28 +354,28 @@ model WageEntry {
 }
 
 model AttendanceCorrection {
-  id                   String           @id @default(uuid()) @db.Uuid
-  organizationId       String           @db.Uuid
+  id                   String           @id @default(uuid()) @map("_id")
+  organizationId       String
   organization         Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  attendanceId         String           @db.Uuid
+  attendanceId         String
   attendance           Attendance       @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
   previousStatus       AttendanceStatus
-  previousHoursWorked  Decimal?         @db.Decimal(5, 2)
-  previousPayableUnits Decimal          @db.Decimal(5, 2)
-  previousWageAmount   Decimal          @db.Decimal(10, 2)
+  previousHoursWorked  Float?
+  previousPayableUnits Float
+  previousWageAmount   Float
   newStatus            AttendanceStatus
-  newHoursWorked       Decimal?         @db.Decimal(5, 2)
-  newPayableUnits      Decimal          @db.Decimal(5, 2)
-  newWageAmount        Decimal          @db.Decimal(10, 2)
-  reason               String           @db.Text
+  newHoursWorked       Float?
+  newPayableUnits      Float
+  newWageAmount        Float
+  reason               String
   status               CorrectionStatus @default(PENDING)
-  requestedByUserId    String           @db.Uuid
+  requestedByUserId    String
   requestedByUser      User             @relation("RequestedCorrections", fields: [requestedByUserId], references: [id], onDelete: Restrict)
   requestedAt          DateTime         @default(now())
-  reviewedByUserId     String?          @db.Uuid
+  reviewedByUserId     String?
   reviewedByUser       User?            @relation("ReviewedCorrections", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
   reviewedAt           DateTime?
-  reviewNotes          String?          @db.Text
+  reviewNotes          String?
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
@@ -389,16 +387,16 @@ model AttendanceCorrection {
 }
 
 model AuditLog {
-  id             String       @id @default(uuid()) @db.Uuid
-  organizationId String       @db.Uuid
+  id             String       @id @default(uuid()) @map("_id")
+  organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  userId         String?      @db.Uuid
+  userId         String?
   user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
-  action         String       @db.VarChar(100)
-  entityType     String       @db.VarChar(60)
-  entityId       String?      @db.VarChar(60)
+  action         String
+  entityType     String
+  entityId       String?
   metadata       Json?
-  ipAddress      String?      @db.VarChar(50)
+  ipAddress      String?
   createdAt      DateTime     @default(now())
 
   @@index([organizationId, createdAt])
@@ -407,14 +405,14 @@ model AuditLog {
 }
 
 model EmailOutbox {
-  id            String         @id @default(uuid()) @db.Uuid
-  recipient     String         @db.VarChar(150)
-  subject       String         @db.VarChar(200)
+  id            String         @id @default(uuid()) @map("_id")
+  recipient     String
+  subject       String
   payload       Json
   attempts      Int            @default(0)
   maxAttempts   Int            @default(3)
   status        EmailJobStatus @default(PENDING)
-  lastError     String?        @db.Text
+  lastError     String?
   nextAttemptAt DateTime       @default(now())
   sentAt        DateTime?
   createdAt     DateTime       @default(now())
@@ -425,7 +423,7 @@ model EmailOutbox {
 }
 
 model RateLimitEntry {
-  key      String   @id @db.VarChar(150)
+  key      String   @id @map("_id")
   points   Int      @default(0)
   expireAt DateTime
 

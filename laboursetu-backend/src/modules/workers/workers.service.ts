@@ -325,7 +325,7 @@ export class WorkersService {
           data: {
             workerId: createdWorker.id,
             wageType: input.initialWage.wageType,
-            rate: new Prisma.Decimal(input.initialWage.rate),
+            rate: new Prisma.Decimal(input.initialWage.rate).toNumber(),
             effectiveFrom: input.initialWage.effectiveFrom || new Date(),
             notes: input.initialWage.notes || 'Initial joining wage rate',
             createdByUserId: actorUserId,
@@ -533,7 +533,7 @@ export class WorkersService {
         data: {
           workerId,
           wageType: input.wageType,
-          rate: new Prisma.Decimal(input.rate),
+          rate: new Prisma.Decimal(input.rate).toNumber(),
           effectiveFrom: effectiveFromDate,
           effectiveTo: input.effectiveTo || null,
           notes: input.notes || null,

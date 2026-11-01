@@ -699,15 +699,15 @@ export class AttendanceService {
             siteId: submission.siteId,
             attendanceDate: targetDate,
             status: entry.status,
-            hoursWorked: hoursDecimal,
-            payableUnits,
+            hoursWorked: hoursDecimal ? hoursDecimal.toNumber() : null,
+            payableUnits: payableUnits.toNumber(),
             notes: entry.notes || null,
             version: 1,
           },
           update: {
             status: entry.status,
-            hoursWorked: hoursDecimal,
-            payableUnits,
+            hoursWorked: hoursDecimal ? hoursDecimal.toNumber() : null,
+            payableUnits: payableUnits.toNumber(),
             notes: entry.notes || null,
             version: { increment: 1 },
           },
@@ -893,9 +893,9 @@ export class AttendanceService {
                 wageRateId: applicableRate.id,
                 wageType: applicableRate.wageType,
                 rate: applicableRate.rate,
-                payableUnits: new Prisma.Decimal('0.00'),
+                payableUnits: 0,
                 hoursWorked: null,
-                grossWage: new Prisma.Decimal('0.00'),
+                grossWage: 0,
                 status: WageEntryStatus.ACTIVE,
                 approvedByUserId: actorUserId,
                 approvedAt: now,
@@ -920,9 +920,9 @@ export class AttendanceService {
               wageRateId: applicableRate.id,
               wageType: applicableRate.wageType,
               rate: applicableRate.rate,
-              payableUnits: calc.payableUnits,
-              hoursWorked: calc.hoursWorked,
-              grossWage: calc.grossWage,
+              payableUnits: calc.payableUnits.toNumber(),
+              hoursWorked: calc.hoursWorked ? calc.hoursWorked.toNumber() : null,
+              grossWage: calc.grossWage.toNumber(),
               status: WageEntryStatus.ACTIVE,
               approvedByUserId: actorUserId,
               approvedAt: now,
@@ -1075,7 +1075,7 @@ export class AttendanceService {
       newWageAmount = calc.grossWage;
     }
 
-    const currentWageAmount = attendance.wageEntries[0]?.grossWage || new Prisma.Decimal('0.00');
+    const currentWageAmount = attendance.wageEntries[0]?.grossWage ?? 0;
 
     const correction = await prisma.$transaction(async (tx) => {
       const created = await tx.attendanceCorrection.create({
@@ -1087,9 +1087,9 @@ export class AttendanceService {
           previousPayableUnits: attendance.payableUnits,
           previousWageAmount: currentWageAmount,
           newStatus: input.newStatus,
-          newHoursWorked,
-          newPayableUnits,
-          newWageAmount,
+          newHoursWorked: newHoursWorked ? newHoursWorked.toNumber() : null,
+          newPayableUnits: newPayableUnits.toNumber(),
+          newWageAmount: newWageAmount.toNumber(),
           reason: input.reason,
           status: CorrectionStatus.PENDING,
           requestedByUserId: actorUserId,
