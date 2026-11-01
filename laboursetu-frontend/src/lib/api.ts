@@ -26,9 +26,12 @@ async function request<T = any>(
   const baseUrl = getApiBaseUrl();
   const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
+  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'x-requested-with': 'XMLHttpRequest',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers as Record<string, string>),
   };
 

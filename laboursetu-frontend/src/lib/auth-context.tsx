@@ -30,6 +30,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(res.data.user);
       return res.data.user;
     } catch {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_token');
+      }
       setUser(null);
       return null;
     } finally {
@@ -49,13 +52,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [pathname, router]);
 
   const login = async (credentials: LoginInput) => {
-    const res = await api.post<{ user: AuthUser }>('/auth/login', credentials);
+    const res = await api.post<{ user: AuthUser; token?: string }>('/auth/login', credentials);
+    if (res.data.token && typeof window !== 'undefined') {
+      localStorage.setItem('auth_token', res.data.token);
+    }
     setUser(res.data.user);
     router.push('/dashboard');
   };
 
   const register = async (data: RegisterInput) => {
-    const res = await api.post<{ user: AuthUser }>('/auth/register', data);
+    const res = await api.post<{ user: AuthUser; token?: string }>('/auth/register', data);
+    if (res.data.token && typeof window !== 'undefined') {
+      localStorage.setItem('auth_token', res.data.token);
+    }
     setUser(res.data.user);
     router.push('/dashboard');
   };
@@ -66,6 +75,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Ignore errors on logout
     } finally {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_token');
+      }
       setUser(null);
       router.push('/login');
     }
