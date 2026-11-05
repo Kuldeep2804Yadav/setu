@@ -7,8 +7,22 @@ import {
 } from '../../database/index.js';
 import { DashboardMetrics } from '../../shared/index.js';
 
+interface CachedMetrics {
+  data: DashboardMetrics;
+  expiresAt: number;
+}
+
+const metricsCache = new Map<string, CachedMetrics>();
+const METRICS_TTL_MS = 15 * 1000; // 15 seconds
+
 export class DashboardService {
   async getMetrics(organizationId: string): Promise<DashboardMetrics> {
+    const now = Date.now();
+    const cached = metricsCache.get(organizationId);
+    if (cached && cached.expiresAt > now) {
+      return cached.data;
+    }
+
     const [
       totalWorkers,
       activeWorkers,
@@ -101,7 +115,7 @@ export class DashboardService {
       count: t._count._all,
     }));
 
-    return {
+    const result: DashboardMetrics = {
       totalWorkers,
       activeWorkers,
       activeSites,
@@ -109,6 +123,13 @@ export class DashboardService {
       recentWorkers: formattedRecentWorkers,
       tradeDistribution,
     };
+
+    metricsCache.set(organizationId, {
+      data: result,
+      expiresAt: now + METRICS_TTL_MS,
+    });
+
+    return result;
   }
 }
 

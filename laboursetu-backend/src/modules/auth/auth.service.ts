@@ -21,6 +21,7 @@ import {
 import { config } from '../../config/index.js';
 import { logAudit } from '../../utils/audit.js';
 import { emailOutboxService } from '../../services/emailOutbox.service.js';
+import { invalidateSessionCache } from '../../middleware/auth.js';
 
 export class AuthService {
   async register(input: RegisterInput, ipAddress?: string, userAgent?: string) {
@@ -204,6 +205,7 @@ export class AuthService {
 
   async logout(sessionId?: string, organizationId?: string, userId?: string) {
     if (sessionId) {
+      invalidateSessionCache();
       await prisma.session.delete({
         where: { id: sessionId },
       }).catch(() => {});

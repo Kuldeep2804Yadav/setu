@@ -14,6 +14,35 @@ declare global {
   }
 }
 
+interface CachedSession {
+  sessionId: string;
+  user: AuthUser;
+  cachedAt: number;
+  expiresAt: Date;
+}
+
+// 60-second in-memory session cache to avoid repeated cloud DB roundtrips on parallel requests
+const SESSION_CACHE_TTL_MS = 60 * 1000;
+const sessionCache = new Map<string, CachedSession>();
+
+// Periodic prune to prevent memory leaks
+setInterval(() => {
+  const now = Date.now();
+  for (const [hash, entry] of sessionCache.entries()) {
+    if (now - entry.cachedAt > SESSION_CACHE_TTL_MS || entry.expiresAt.getTime() <= now) {
+      sessionCache.delete(hash);
+    }
+  }
+}, 5 * 60 * 1000).unref();
+
+export function invalidateSessionCache(tokenHash?: string): void {
+  if (tokenHash) {
+    sessionCache.delete(tokenHash);
+  } else {
+    sessionCache.clear();
+  }
+}
+
 export async function authMiddleware(
   req: Request,
   _res: Response,
@@ -31,8 +60,21 @@ export async function authMiddleware(
     }
 
     const tokenHash = hashToken(rawToken);
+    const now = Date.now();
 
-    // 2. Query session from database
+    // Fast path: In-memory cache hit (0ms)
+    const cached = sessionCache.get(tokenHash);
+    if (
+      cached &&
+      now - cached.cachedAt < SESSION_CACHE_TTL_MS &&
+      cached.expiresAt.getTime() > now
+    ) {
+      req.sessionId = cached.sessionId;
+      req.user = cached.user;
+      return next();
+    }
+
+    // 2. Query session from database (Atlas)
     const session = await prisma.session.findFirst({
       where: {
         token: tokenHash,
@@ -50,11 +92,11 @@ export async function authMiddleware(
     });
 
     if (!session || !session.user || !session.user.isActive) {
+      sessionCache.delete(tokenHash);
       throw new UnauthorizedError('Invalid or expired session');
     }
 
-    req.sessionId = session.id;
-    req.user = {
+    const authUser: AuthUser = {
       id: session.user.id,
       organizationId: session.organizationId,
       name: session.user.name,
@@ -72,6 +114,17 @@ export async function authMiddleware(
         address: session.user.organization.address,
       },
     };
+
+    // Store in in-memory cache
+    sessionCache.set(tokenHash, {
+      sessionId: session.id,
+      user: authUser,
+      cachedAt: now,
+      expiresAt: session.expiresAt,
+    });
+
+    req.sessionId = session.id;
+    req.user = authUser;
 
     next();
   } catch (error) {

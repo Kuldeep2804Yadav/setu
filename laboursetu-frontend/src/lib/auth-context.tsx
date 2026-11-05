@@ -1,8 +1,8 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { api, ApiError } from './api';
+import { api } from './api';
 import { AuthUser, LoginInput, RegisterInput } from '@/contracts';
 
 interface AuthContextType {
@@ -23,8 +23,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+  const hasInitialized = useRef(false);
 
-  const fetchCurrentUser = async () => {
+  const fetchCurrentUser = useCallback(async () => {
     try {
       const res = await api.get<{ user: AuthUser }>('/auth/me');
       setUser(res.data.user);
@@ -38,18 +39,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
+  // Initial authentication check on application mount
   useEffect(() => {
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    const isPublic = PUBLIC_PATHS.some((path) => pathname?.startsWith(path));
+
+    // If there is no token saved and user is on a public page, do not delay loading with an extra request
+    if (!token && isPublic) {
+      setIsLoading(false);
+      return;
+    }
+
+    // Verify session
     fetchCurrentUser().then((currentUser) => {
-      const isPublicPath = PUBLIC_PATHS.some((path) => pathname?.startsWith(path));
-      if (!currentUser && !isPublicPath) {
+      if (!currentUser && !isPublic) {
         router.push('/login');
       } else if (currentUser && (pathname === '/login' || pathname === '/register')) {
         router.push('/dashboard');
       }
     });
-  }, [pathname, router]);
+  }, [fetchCurrentUser, pathname, router]);
+
+  // Route protection on navigation without re-fetching /auth/me every time
+  useEffect(() => {
+    if (isLoading) return;
+
+    const isPublic = PUBLIC_PATHS.some((path) => pathname?.startsWith(path));
+    if (!user && !isPublic) {
+      router.push('/login');
+    } else if (user && (pathname === '/login' || pathname === '/register')) {
+      router.push('/dashboard');
+    }
+  }, [pathname, user, isLoading, router]);
 
   const login = async (credentials: LoginInput) => {
     const res = await api.post<{ user: AuthUser; token?: string }>('/auth/login', credentials);

@@ -1,13 +1,11 @@
 import rateLimit from 'express-rate-limit';
 import { config } from '../config/index.js';
-import { PrismaRateLimitStore } from '../services/sharedRateLimit.service.js';
 
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: config.isTest ? 1000 : 20, // 20 attempts per 15 min in prod/dev
+  max: config.isTest ? 1000 : 30, // 30 attempts per 15 min
   standardHeaders: true,
   legacyHeaders: false,
-  store: config.isTest ? undefined : new PrismaRateLimitStore(),
   message: {
     success: false,
     error: {
@@ -19,10 +17,9 @@ export const authRateLimiter = rateLimit({
 
 export const apiRateLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: config.isTest ? 5000 : 120, // 120 requests per minute
+  max: config.isTest ? 5000 : 300, // 300 requests per minute
   standardHeaders: true,
   legacyHeaders: false,
-  store: config.isTest ? undefined : new PrismaRateLimitStore(),
   message: {
     success: false,
     error: {
