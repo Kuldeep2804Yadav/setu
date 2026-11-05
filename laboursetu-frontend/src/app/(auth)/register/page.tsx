@@ -40,7 +40,7 @@ export default function RegisterPage() {
   };
 
   const labelClass = 'block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5';
-  const inputClass = 'bg-slate-950/80 border-slate-700/80 text-white placeholder:text-slate-500 rounded-xl focus:border-amber-500 focus:ring-amber-500/20';
+  const inputClass = 'bg-slate-950/80 border-slate-700/80 text-black placeholder:text-slate-500 rounded-xl focus:border-amber-500 focus:ring-amber-500/20';
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
