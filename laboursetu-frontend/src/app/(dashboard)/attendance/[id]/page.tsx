@@ -51,6 +51,8 @@ export default function AttendanceDetailPage() {
   const [correctionHours, setCorrectionHours] = useState<string>('8');
   const [correctionReason, setCorrectionReason] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
+  const [assignmentWorker, setAssignmentWorker] = useState<{ id: string; name: string } | null>(null);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
 
   // 1. Fetch submission details
   const {
@@ -65,7 +67,7 @@ export default function AttendanceDetailPage() {
   const submission = subData?.data;
 
   // 2. Fetch site roster for eligibility & completeness
-  const { data: rosterData, isLoading: isRosterLoading } = useQuery({
+  const { data: rosterData, isLoading: isRosterLoading, error: rosterError, refetch: refetchRoster } = useQuery({
     queryKey: ['attendance-roster', submission?.siteId, submission?.attendanceDate],
     queryFn: () =>
       api.get<any>(`/attendance/roster/${submission.siteId}?date=${submission.attendanceDate}`),
@@ -93,6 +95,26 @@ export default function AttendanceDetailPage() {
   }, [submission]);
 
   // Mutations
+  const assignWorkerMutation = useMutation({
+    mutationFn: (workerId: string) =>
+      api.post(`/workers/${workerId}/assign-site`, {
+        siteId: submission.siteId,
+        startDate: submission.attendanceDate,
+      }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['attendance-roster'] }),
+        queryClient.invalidateQueries({ queryKey: ['workers'] }),
+        queryClient.invalidateQueries({ queryKey: ['worker-details'] }),
+        queryClient.invalidateQueries({ queryKey: ['sites'] }),
+        queryClient.invalidateQueries({ queryKey: ['site-details'] }),
+      ]);
+      setAssignmentWorker(null);
+      setAssignmentError(null);
+    },
+    onError: (err: Error) => setAssignmentError(err.message || 'Failed to assign worker to this site.'),
+  });
+
   const saveDraftMutation = useMutation({
     mutationFn: (entries: LocalEntry[]) =>
       api.put(`/attendance/submissions/${submissionId}/draft`, { entries }),
@@ -155,6 +177,8 @@ export default function AttendanceDetailPage() {
   const isEditable = submission?.status === 'DRAFT' || submission?.status === 'REJECTED';
   const isSubmitted = submission?.status === 'SUBMITTED';
   const isApproved = submission?.status === 'APPROVED';
+  const canAssignWorkers = isEditable && !!user &&
+    ['OWNER', 'ACCOUNTANT', 'SUPERVISOR'].includes(user.role);
 
   const isSelfSubmission = submission?.submittedByUser?.id === user?.id;
   const canApprove =
@@ -300,6 +324,18 @@ export default function AttendanceDetailPage() {
         <p className="text-sm font-medium">Failed to load attendance submission</p>
         <Button onClick={() => router.push('/attendance')} className="mt-4" variant="outline">
           Back to Attendance List
+        </Button>
+      </div>
+    );
+  }
+
+  if (rosterError) {
+    return (
+      <div className="p-16 text-center text-rose-600" role="alert">
+        <AlertCircle className="w-8 h-8 mx-auto mb-3" />
+        <p className="text-sm font-medium">Failed to load the site roster: {rosterError.message}</p>
+        <Button onClick={() => void refetchRoster()} className="mt-4" variant="outline">
+          Retry loading roster
         </Button>
       </div>
     );
@@ -525,6 +561,19 @@ export default function AttendanceDetailPage() {
           <div className="p-12 text-center text-slate-500">
             <AlertCircle className="w-10 h-10 text-slate-300 mx-auto mb-2" />
             <p className="text-sm font-medium">No workers have active assignments to this site on {submission.attendanceDate}.</p>
+            <p className="text-sm mt-2">
+              Assign workers to this site starting on or before the attendance date to mark attendance.
+            </p>
+            {canAssignWorkers && ineligibleWorkers.length > 0 && (
+              <Button className="mt-4" variant="outline" onClick={() => setShowIneligible(true)}>
+                Show workers to assign
+              </Button>
+            )}
+            {canAssignWorkers && ineligibleWorkers.length === 0 && (
+              <Button className="mt-4" variant="outline" onClick={() => router.push('/workers')}>
+                Manage workers
+              </Button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -752,7 +801,7 @@ export default function AttendanceDetailPage() {
                 Ineligible / Excluded Workers ({ineligibleWorkers.length})
               </span>
               <span className="text-xs text-slate-500 font-normal">
-                - Workers with expired or future site assignments on {submission.attendanceDate}
+                - Workers without a covering assignment or archived on {submission.attendanceDate}
               </span>
             </div>
             {showIneligible ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
@@ -770,7 +819,21 @@ export default function AttendanceDetailPage() {
                       <span className="font-semibold text-slate-800">{w.name}</span>{' '}
                       <span className="font-mono text-slate-500">({w.code})</span> • {w.trade}
                     </div>
-                    <span className="text-rose-600 font-medium">{w.ineligibilityReason}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-rose-600 font-medium">{w.ineligibilityReason}</span>
+                      {canAssignWorkers && w.status !== 'ARCHIVED' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setAssignmentError(null);
+                            setAssignmentWorker({ id: w.id, name: w.name });
+                          }}
+                        >
+                          Assign to this site
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -778,6 +841,30 @@ export default function AttendanceDetailPage() {
           )}
         </Card>
       )}
+
+      <Modal
+        isOpen={!!assignmentWorker}
+        onClose={() => { if (!assignWorkerMutation.isPending) setAssignmentWorker(null); }}
+        title="Assign worker to this site"
+      >
+        <p className="text-sm text-slate-700">
+          Assign {assignmentWorker?.name} to {submission.site?.name} starting {formatDateDisplay(submission.attendanceDate)}?
+          Any current active assignment will end on this date. This assignment will continue until changed.
+        </p>
+        {assignmentError && <p role="alert" className="mt-3 text-sm text-rose-600">{assignmentError}</p>}
+        <div className="flex justify-end gap-3 mt-6">
+          <Button variant="outline" disabled={assignWorkerMutation.isPending} onClick={() => setAssignmentWorker(null)}>
+            Cancel
+          </Button>
+          <Button
+            isLoading={assignWorkerMutation.isPending}
+            disabled={!assignmentWorker || !canAssignWorkers}
+            onClick={() => { if (assignmentWorker) assignWorkerMutation.mutate(assignmentWorker.id); }}
+          >
+            Assign worker
+          </Button>
+        </div>
+      </Modal>
 
       {/* Rejection Modal */}
       <Modal
