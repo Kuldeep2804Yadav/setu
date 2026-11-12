@@ -30,6 +30,9 @@ export default function DashboardLayout({
     <div className="flex min-h-screen bg-slate-50">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <nav aria-label="Mobile navigation" className="flex gap-4 overflow-x-auto border-b border-slate-200 bg-white px-4 py-3 text-sm md:hidden">
+          {['dashboard','sites','workers','attendance','wages',...(['OWNER','ACCOUNTANT'].includes(user.role)?['finance']:[]),'settings'].map(path=><a key={path} href={`/${path}`} className="whitespace-nowrap capitalize text-slate-700">{path==='finance'?'Payroll & payments':path}</a>)}
+        </nav>
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>

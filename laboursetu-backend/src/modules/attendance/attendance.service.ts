@@ -39,6 +39,7 @@ import {
   roundHalfUp,
 } from '../../utils/wage.js';
 import { logAudit } from '../../utils/audit.js';
+import { sourceTransaction } from '../payroll/finance.repository.js';
 
 export class AttendanceService {
   /**
@@ -596,7 +597,7 @@ export class AttendanceService {
     const dayEnd = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate(), 23, 59, 59, 999));
 
     // Process all entries inside a transaction
-    await prisma.$transaction(async (tx) => {
+    await sourceTransaction(organizationId, async (tx) => {
       for (const entry of input.entries) {
         // 1. Verify worker belongs to tenant
         const worker = await tx.worker.findFirst({
@@ -855,7 +856,7 @@ export class AttendanceService {
     const now = new Date();
 
     // 4. Atomic Transaction: Transition status + Snapshot Wage Entries + Audit Log
-    await prisma.$transaction(async (tx) => {
+    await sourceTransaction(organizationId, async (tx) => {
       // Optimistic concurrency update
       const updatedSubmission = await tx.attendanceSubmission.update({
         where: {
@@ -980,7 +981,7 @@ export class AttendanceService {
 
     const now = new Date();
 
-    await prisma.$transaction(async (tx) => {
+    await sourceTransaction(organizationId, async (tx) => {
       await tx.attendanceSubmission.update({
         where: { id: submissionId, version: submission.version },
         data: {
@@ -1077,7 +1078,7 @@ export class AttendanceService {
 
     const currentWageAmount = attendance.wageEntries[0]?.grossWage ?? 0;
 
-    const correction = await prisma.$transaction(async (tx) => {
+    const correction = await sourceTransaction(organizationId, async (tx) => {
       const created = await tx.attendanceCorrection.create({
         data: {
           organizationId,
@@ -1171,7 +1172,7 @@ export class AttendanceService {
     const now = new Date();
 
     if (input.action === 'REJECT') {
-      const updated = await prisma.$transaction(async (tx) => {
+      const updated = await sourceTransaction(organizationId, async (tx) => {
         const res = await tx.attendanceCorrection.update({
           where: { id: correctionId },
           data: {
@@ -1204,7 +1205,7 @@ export class AttendanceService {
     const dayEnd = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate(), 23, 59, 59, 999));
     const applicableRate = correction.attendance.worker.wageRates.find((r) => r.effectiveFrom <= dayEnd);
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const updated = await sourceTransaction(organizationId, async (tx) => {
       // 1. Mark correction approved
       const approvedCorrection = await tx.attendanceCorrection.update({
         where: { id: correctionId },

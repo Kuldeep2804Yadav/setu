@@ -1,5 +1,17 @@
 # LabourSetu backend
 
+## Phase 3 MongoDB financial management
+
+The active provider is MongoDB, as explicitly confirmed for Phase 3. Financial
+amounts use exact decimal strings and backend Decimal arithmetic. See
+[deployment, invariants and API documentation](docs/PHASE_3_MONGODB.md) and
+[verification status](PHASE_3_COMPLETION_REPORT.md). MongoDB must be a replica
+set. Apply new collections/indexes with `PHASE3_APPLY_ADDITIVE=true pnpm db:phase3`
+(set the environment variable using your shell's syntax). Existing SQL migration
+history below is preserved for reference; do not run PostgreSQL migration
+commands against MongoDB. `pnpm test:finance` creates its own isolated local test
+database and never connects to an existing DATABASE_URL.
+
 Independent Express/TypeScript API with the original Prisma PostgreSQL layer and
 Phase 1/2 business services. Requires Node 20+, pnpm 9.15.4 and PostgreSQL.
 

@@ -15,6 +15,7 @@ import { workersRoutes } from './modules/workers/workers.routes.js';
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js';
 import { attendanceRoutes } from './modules/attendance/attendance.routes.js';
 import { wagesRoutes } from './modules/wages/wages.routes.js';
+import { financeRoutes } from './modules/payroll/finance.routes.js';
 
 export const app = express();
 
@@ -63,6 +64,7 @@ v1Router.use('/workers', workersRoutes);
 v1Router.use('/dashboard', dashboardRoutes);
 v1Router.use('/attendance', attendanceRoutes);
 v1Router.use('/wages', wagesRoutes);
+v1Router.use('/finance', financeRoutes);
 
 app.use('/api/v1', v1Router);
 

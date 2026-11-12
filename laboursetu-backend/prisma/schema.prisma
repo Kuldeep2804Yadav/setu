@@ -430,3 +430,234 @@ model RateLimitEntry {
   @@index([expireAt])
   @@map("rate_limit_entries")
 }
+
+// Phase 3: MongoDB Prisma does not support Decimal. Canonical decimal strings
+// are calculated with Decimal, never with MongoDB $sum or JavaScript Number.
+model FinanceMutex {
+  id      String @id @map("_id")
+  version Int    @default(0)
+  @@map("finance_mutexes")
+}
+
+model FinanceSettings {
+  id                     String @id @map("_id")
+  organizationId         String @unique
+  paidLeave              Boolean @default(false)
+  periodAbsenceRule      String @default("UNPAID")
+  monthlyDivisor         String @default("CALENDAR_MONTH")
+  weeklyDivisor          String @default("7")
+  paidLeaveHours         String @default("8")
+  accountantCanApprove   Boolean @default(false)
+  updatedBy              String
+  updatedAt              DateTime @updatedAt
+  @@map("finance_settings")
+}
+
+model FinancialWageRate {
+  id             String @id @default(uuid()) @map("_id")
+  organizationId String
+  workerId       String
+  type           String
+  amount         String
+  effectiveFrom  DateTime
+  createdBy      String
+  createdAt      DateTime @default(now())
+  @@unique([organizationId, workerId, effectiveFrom])
+  @@index([organizationId, workerId])
+  @@map("financial_wage_rates")
+}
+
+model FinancialWorkSupplement {
+  id             String @id @default(uuid()) @map("_id")
+  organizationId String
+  attendanceId   String
+  paidLeave      Boolean @default(false)
+  overtimeHours  String @default("0")
+  overtimeRate   String @default("0")
+  reason         String
+  approvedBy     String
+  createdAt      DateTime @default(now())
+  @@unique([organizationId, attendanceId])
+  @@map("financial_work_supplements")
+}
+
+model PayrollPeriod {
+  id             String @id @default(uuid()) @map("_id")
+  organizationId String
+  name           String
+  startDate      DateTime
+  endDate        DateTime
+  frequency      String
+  status         String @default("DRAFT")
+  policy         Json
+  createdBy      String
+  approvedBy     String?
+  finalizedBy    String?
+  finalizedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  items          PayrollItem[]
+  @@index([organizationId, startDate, endDate])
+  @@index([organizationId, status])
+  @@map("payroll_periods")
+}
+
+model PayrollItem {
+  id             String @id @default(uuid()) @map("_id")
+  organizationId String
+  payrollId      String
+  payroll        PayrollPeriod @relation(fields: [payrollId], references: [id], onDelete: Restrict)
+  workerId       String
+  workerName     String
+  workerCode     String
+  gross          String
+  bonus          String
+  deductions     String
+  recovery       String
+  net            String
+  components     Json
+  adjustments    Json
+  @@unique([payrollId, workerId])
+  @@index([organizationId, workerId])
+  @@map("payroll_items")
+}
+
+model PayrollSourceClaim {
+  id             String @id @default(uuid()) @map("_id")
+  organizationId String
+  attendanceId   String
+  payrollId      String
+  sourceVersion  Int
+  @@unique([organizationId, attendanceId])
+  @@index([organizationId, payrollId])
+  @@map("payroll_source_claims")
+}
+
+model WorkerAdvance {
+  id             String @id @default(uuid()) @map("_id")
+  organizationId String
+  workerId       String
+  siteId         String
+  amount         String
+  date           DateTime
+  method         String
+  reference      String?
+  status         String @default("PENDING")
+  createdBy      String
+  confirmedBy    String?
+  confirmedAt    DateTime?
+  reversedBy     String?
+  reversalReason String?
+  createdAt      DateTime @default(now())
+  @@index([organizationId, workerId, date])
+  @@map("worker_advances")
+}
+
+model AdvanceRecovery {
+  id             String @id @default(uuid()) @map("_id")
+  organizationId String
+  advanceId      String
+  payrollId      String
+  workerId       String
+  amount         String
+  status         String @default("RESERVED")
+  @@unique([organizationId, advanceId, payrollId])
+  @@index([organizationId, payrollId])
+  @@map("advance_recoveries")
+}
+
+model PayrollAdjustment {
+  id             String @id @default(uuid()) @map("_id")
+  organizationId String
+  workerId       String
+  siteId         String
+  date           DateTime
+  type           String
+  amount         String
+  reason         String
+  createdBy      String
+  approvedBy     String
+  payrollId      String?
+  correctsPayrollId String?
+  createdAt      DateTime @default(now())
+  @@index([organizationId, workerId, date])
+  @@map("payroll_adjustments")
+}
+
+model WorkerPayment {
+  id             String @id @default(uuid()) @map("_id")
+  organizationId String
+  workerId       String
+  payrollItemId  String
+  amount         String
+  date           DateTime
+  method         String
+  reference      String?
+  status         String @default("PENDING")
+  confirmation   String @default("UNCONFIRMED")
+  createdBy      String
+  confirmedBy    String?
+  confirmedAt    DateTime?
+  reversedBy     String?
+  reversalReason String?
+  allocations    Json
+  createdAt      DateTime @default(now())
+  @@index([organizationId, workerId, date])
+  @@index([organizationId, payrollItemId, status])
+  @@map("worker_payments")
+}
+
+model LedgerEntry {
+  id             String @id @default(uuid()) @map("_id")
+  organizationId String
+  workerId       String
+  siteId         String
+  payrollId      String?
+  payrollItemId  String?
+  type           String
+  amount         String
+  referenceId    String
+  date           DateTime
+  createdBy      String
+  description    String
+  reversesId     String?
+  idempotencyKey String
+  createdAt      DateTime @default(now())
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, workerId, date])
+  @@index([organizationId, siteId, date])
+  @@map("ledger_entries")
+}
+
+model PaymentReceipt {
+  id             String @id @default(uuid()) @map("_id")
+  organizationId String
+  paymentId      String @unique
+  snapshot       Json
+  createdAt      DateTime @default(now())
+  @@index([organizationId])
+  @@map("payment_receipts")
+}
+
+model FinancialRequest {
+  id             String @id @default(uuid()) @map("_id")
+  organizationId String
+  key            String
+  hash           String
+  result         Json
+  createdAt      DateTime @default(now())
+  @@unique([organizationId, key])
+  @@map("financial_requests")
+}
+
+model PayrollAuditLog {
+  id             String @id @default(uuid()) @map("_id")
+  organizationId String
+  actorId        String
+  action         String
+  entityId       String
+  details        Json
+  createdAt      DateTime @default(now())
+  @@index([organizationId, entityId, createdAt])
+  @@map("payroll_audit_logs")
+}

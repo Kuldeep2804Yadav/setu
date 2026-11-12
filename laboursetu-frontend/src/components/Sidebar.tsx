@@ -26,12 +26,13 @@ export function Sidebar() {
     { label: 'Workers', href: '/workers', icon: Users2 },
     { label: 'Attendance', href: '/attendance', icon: CalendarCheck },
     { label: 'Wage Register', href: '/wages', icon: Receipt },
+    ...(['OWNER', 'ACCOUNTANT'].includes(user?.role ?? '') ? [{ label: 'Payroll & Payments', href: '/finance', icon: Receipt }] : []),
     { label: 'Team', href: '/team', icon: ShieldCheck },
     { label: 'Settings', href: '/settings', icon: Settings },
   ];
 
   return (
-    <aside className="w-64 bg-slate-900 text-slate-200 flex flex-col min-h-screen border-r border-slate-800">
+    <aside className="hidden w-56 bg-slate-900 text-slate-200 md:flex lg:w-64 flex-col min-h-screen border-r border-slate-800">
       {/* Brand Header */}
       <div className="h-16 px-6 flex items-center gap-3 border-b border-slate-800 bg-slate-950/40">
         <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center text-slate-950 shadow-md">

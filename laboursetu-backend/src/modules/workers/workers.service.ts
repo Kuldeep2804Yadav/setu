@@ -1,3 +1,4 @@
+import { sourceTransaction } from '../payroll/finance.repository.js';
 import {
   prisma,
   WorkerStatus,
@@ -303,7 +304,7 @@ export class WorkersService {
     }
 
     // 4. Atomic creation of Worker + Wage Rate + Site Assignment
-    const worker = await prisma.$transaction(async (tx) => {
+    const worker = await sourceTransaction(organizationId, async (tx) => {
       const createdWorker = await tx.worker.create({
         data: {
           organizationId,
@@ -465,16 +466,16 @@ export class WorkersService {
 
     const now = new Date();
 
-    await prisma.$transaction([
-      prisma.worker.update({
+    await sourceTransaction(organizationId, async tx => {
+      await tx.worker.update({
         where: { id: workerId },
         data: {
           status: WorkerStatus.ARCHIVED,
           archivedAt: now,
         },
-      }),
+      });
       // Mark current site assignment completed
-      prisma.workerSiteAssignment.updateMany({
+      await tx.workerSiteAssignment.updateMany({
         where: {
           workerId,
           status: AssignmentStatus.ACTIVE,
@@ -483,8 +484,8 @@ export class WorkersService {
           status: AssignmentStatus.COMPLETED,
           endDate: now,
         },
-      }),
-    ]);
+      });
+    });
 
     await logAudit({
       organizationId,
@@ -516,7 +517,7 @@ export class WorkersService {
         ? input.effectiveFrom
         : new Date(input.effectiveFrom);
 
-    const wageRate = await prisma.$transaction(async (tx) => {
+    const wageRate = await sourceTransaction(organizationId, async (tx) => {
       // Close any open-ended prior wage rates where effectiveTo is null
       await tx.wageRate.updateMany({
         where: {
@@ -591,7 +592,7 @@ export class WorkersService {
 
     const startDate = input.startDate || new Date();
 
-    const assignment = await prisma.$transaction(async (tx) => {
+    const assignment = await sourceTransaction(organizationId, async (tx) => {
       // Complete any existing active assignments
       await tx.workerSiteAssignment.updateMany({
         where: {
