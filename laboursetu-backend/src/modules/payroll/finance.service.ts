@@ -9,7 +9,7 @@ import {
 import {
   calculateWages,
   money,
-  paymentBalance,
+  paymentAvailability,
   settleAmounts,
   validateRecovery,
   type WagePolicy,
@@ -1133,13 +1133,13 @@ export async function listFinance(
     where,
     ...pagination,
     orderBy: [{ startDate: "desc" }, { id: "asc" }],
-    include: { items: true },
+    include: { items: query.workerId ? { where: { workerId: query.workerId } } : true },
   });
   const paid = await prisma.workerPayment.findMany({
     where: {
       organizationId: org,
       payrollItemId: { in: periods.flatMap((p) => p.items.map((i) => i.id)) },
-      status: "CONFIRMED",
+      status: { in: ['PENDING', 'CONFIRMED'] },
     },
   });
   return {
@@ -1147,11 +1147,11 @@ export async function listFinance(
       ...p,
       items: p.items.map((i) => ({
         ...i,
-        ...paymentBalance(
+        ...paymentAvailability(
           i.net,
           paid
             .filter((payment) => payment.payrollItemId === i.id)
-            .map((payment) => payment.amount),
+            .map((payment) => ({ amount: payment.amount, status: payment.status })),
         ),
       })),
     })),
@@ -1188,11 +1188,11 @@ export async function payrollDetail(actor: Actor, id: string) {
       .map((c) => c.attendanceId),
     items: period.items.map((i) => ({
       ...i,
-      ...paymentBalance(
+      ...paymentAvailability(
         i.net,
         payments
-          .filter((p) => p.payrollItemId === i.id && p.status === "CONFIRMED")
-          .map((p) => p.amount),
+          .filter((p) => p.payrollItemId === i.id)
+          .map((p) => ({ amount: p.amount, status: p.status })),
       ),
       payments: payments.filter((p) => p.payrollItemId === i.id),
     })),

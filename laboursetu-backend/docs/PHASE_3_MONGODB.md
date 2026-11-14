@@ -161,6 +161,13 @@ Content-Type: application/json
 The response remains PENDING until the separate explicit confirmation request.
 No UPI PIN, password, bank credential or automated payout is used.
 
+Payroll list and detail items return `pending`, `availablePayment`, and
+`canRecordPayment` alongside confirmed `paid`, `outstanding`, and settlement
+`status`. Pending records reserve funds without reducing outstanding wages or
+claiming payment success. Cancelling a pending record releases its reservation;
+confirmation moves the amount from pending to paid. Payroll lists filtered by
+`workerId` return only that worker's items, including in multi-worker periods.
+
 ## Tests and visual QA
 
 `pnpm test:unit`, `pnpm test:finance`, frontend `pnpm test`, `pnpm lint`, and

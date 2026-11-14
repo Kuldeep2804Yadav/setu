@@ -32,6 +32,9 @@ interface Item {
   net: string;
   paid?: string;
   outstanding?: string;
+  pending: string;
+  availablePayment: string;
+  canRecordPayment: boolean;
   status?: string;
 }
 interface Period {
@@ -195,6 +198,7 @@ export default function FinanceWorkspace({
   const [startDate, setStart] = useState("");
   const [endDate, setEnd] = useState("");
   const [page, setPage] = useState(1);
+  const [paymentItemId, setPaymentItemId] = useState('');
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -289,6 +293,10 @@ export default function FinanceWorkspace({
     enabled: allowed && section === "settings",
   });
   const selectedSettings = settingsDraft ?? settings.data?.data;
+  const paymentOptions = (periods.data?.data ?? []).flatMap(period => period.items
+    .filter(item => (!workerId || item.workerId === workerId) && item.canRecordPayment)
+    .map(item => ({ period, item })));
+  const selectedPaymentItem = paymentOptions.find(option => option.item.id === paymentItemId)?.item;
   const workerName = (id: string) =>
     workers.data?.data.find((w) => w.id === id)?.name ?? id;
   async function command<T>(
@@ -460,10 +468,13 @@ export default function FinanceWorkspace({
             ))}
           </select>
         </Field>
-        <Field label="From">
+        <Field label={section === 'payroll' ? 'From (required)' : 'From'}>
           <input
             className={inputClass}
             type="date"
+            name="startDate"
+            form={section === 'payroll' ? 'payroll-generation' : undefined}
+            required={section === 'payroll'}
             value={startDate}
             onChange={(e) => {
               setStart(e.target.value);
@@ -471,10 +482,14 @@ export default function FinanceWorkspace({
             }}
           />
         </Field>
-        <Field label="Through">
+        <Field label={section === 'payroll' ? 'Through (required)' : 'Through'}>
           <input
             className={inputClass}
             type="date"
+            name="endDate"
+            form={section === 'payroll' ? 'payroll-generation' : undefined}
+            required={section === 'payroll'}
+            min={section === 'payroll' && startDate ? startDate : undefined}
             value={endDate}
             onChange={(e) => {
               setEnd(e.target.value);
@@ -544,6 +559,7 @@ export default function FinanceWorkspace({
       {section === "payroll" && (
         <>
           <form
+            id="payroll-generation"
             className="space-y-4 rounded-xl border border-slate-200 bg-white p-5"
             onSubmit={async (e) => {
               e.preventDefault();
@@ -555,7 +571,7 @@ export default function FinanceWorkspace({
                 endDate,
                 ...(workerId ? { workerId } : {}),
                 ...(siteId ? { siteId } : {}),
-                recoveries: recoveryRows,
+                recoveries: recoveryRows.filter(row => row.advanceId || row.amount),
               };
               const result = await command<Preview>("/payroll/preview", body);
               if (result) setPreview({ ...result, input: body });
@@ -582,13 +598,14 @@ export default function FinanceWorkspace({
               </Field>
             </div>
             <p className="text-sm text-slate-500">
-              Choose the period and optional worker/site above. Advance recovery
-              is optional and requires confirmed issuance.
+              Enter the required From and Through dates above before previewing payroll.
+              Worker and site filters are optional. Advance recovery requires confirmed
+              issuance; leave recovery rows empty to skip deductions.
             </p>
             {recoveryRows.map((row, i) => (
               <div key={i} className="flex flex-wrap gap-2">
                 <select
-                  required
+                  required={!!row.amount}
                   aria-label="Advance to recover"
                   className={`${inputClass} max-w-md`}
                   value={row.advanceId}
@@ -609,7 +626,7 @@ export default function FinanceWorkspace({
                   ))}
                 </select>
                 <input
-                  required
+                  required={!!row.advanceId}
                   aria-label="Recovery amount"
                   className={`${inputClass} max-w-40`}
                   value={row.amount}
@@ -648,7 +665,7 @@ export default function FinanceWorkspace({
               >
                 Add recovery
               </Button>
-              <Button disabled={!startDate || !endDate} isLoading={busy}>
+              <Button isLoading={busy}>
                 Preview payroll
               </Button>
             </div>
@@ -722,7 +739,7 @@ export default function FinanceWorkspace({
                   ? { ...values, workerId, siteId }
                   : values;
               const result = await command(`/${section}`, body);
-              if (result) form.reset();
+              if (result) { form.reset(); setPaymentItemId(''); }
             }}
           >
             <h2 className="font-semibold">
@@ -738,17 +755,20 @@ export default function FinanceWorkspace({
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {section === "payments" && (
                 <Field label="Finalized worker payroll">
-                  <select required name="payrollItemId" className={inputClass}>
+                  <select required name="payrollItemId" className={inputClass}
+                    value={selectedPaymentItem?.id ?? ''} onChange={e => setPaymentItemId(e.target.value)}>
                     <option value="">Select payroll item</option>
-                    {periods.data?.data.flatMap((p) =>
-                      p.items.map((i) => (
-                        <option key={i.id} value={i.id}>
-                          {p.name} · {i.workerName} · outstanding{" "}
-                          {i.outstanding ?? i.net}
-                        </option>
-                      )),
-                    )}
+                    {paymentOptions.map(({ period, item }) => (
+                      <option key={item.id} value={item.id}>
+                        {period.name} · {item.workerName} · available {item.availablePayment}
+                      </option>
+                    ))}
                   </select>
+                  {selectedPaymentItem && <span className="block text-xs text-slate-500">
+                    Outstanding: {selectedPaymentItem.outstanding} · Pending confirmation: {selectedPaymentItem.pending} · Available for a new payment: {selectedPaymentItem.availablePayment}
+                  </span>}
+                  {!periods.isLoading && !periods.error && !paymentOptions.length &&
+                    <span className="block text-xs text-slate-500">No finalized wages are available for a new payment. Confirm or cancel existing pending records to release reserved amounts.</span>}
                 </Field>
               )}
               <Field label="Amount">
@@ -787,7 +807,7 @@ export default function FinanceWorkspace({
             </div>
             <Button
               isLoading={busy}
-              disabled={section === "advances" && (!workerId || !siteId)}
+              disabled={section === "advances" ? (!workerId || !siteId) : !selectedPaymentItem}
             >
               Save pending record
             </Button>

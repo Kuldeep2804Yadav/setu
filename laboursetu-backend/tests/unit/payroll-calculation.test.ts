@@ -3,6 +3,7 @@ import {
   calculateWages,
   decimal,
   paymentBalance,
+  paymentAvailability,
   settleAmounts,
   validateRecovery,
   type HistoricalRate,
@@ -37,6 +38,17 @@ const calculate = (
 ) => calculateWages(work, { worker1: rates }, rules);
 
 describe("Phase 3 exact wage engine (database independent)", () => {
+  it('separates outstanding wages from pending reservations using exact paise', () => {
+    expect(paymentAvailability('0.60', [
+      { status: 'CONFIRMED', amount: '0.10' },
+      { status: 'PENDING', amount: '0.20' },
+      { status: 'PENDING', amount: '0.10' },
+      { status: 'CANCELLED', amount: '0.30' },
+      { status: 'REVERSED', amount: '0.40' },
+    ])).toEqual({ paid: '0.10', outstanding: '0.50', status: 'PARTIALLY_PAID', pending: '0.30', availablePayment: '0.20', canRecordPayment: true });
+    expect(paymentAvailability('0.60', [{ status: 'PENDING', amount: '0.60' }])).toMatchObject({ status: 'UNPAID', availablePayment: '0.00', canRecordPayment: false });
+    expect(paymentAvailability('0.60', [{ status: 'CONFIRMED', amount: '0.70' }])).toMatchObject({ status: 'OVERPAID', availablePayment: '0.00', canRecordPayment: false });
+  });
   it("calculates daily wages", () => expect(calculate().gross).toBe("600.00"));
   it("calculates half days", () =>
     expect(calculate([{ ...day, status: "HALF_DAY" }]).gross).toBe("300.00"));

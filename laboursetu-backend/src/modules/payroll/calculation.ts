@@ -270,6 +270,17 @@ export function paymentBalance(net: string, confirmedPayments: string[]) {
   };
 }
 
+export function paymentAvailability(
+  net: string,
+  payments: { amount: string; status: string }[],
+) {
+  const balance = paymentBalance(net, payments.filter(p => p.status === 'CONFIRMED').map(p => p.amount));
+  const pending = payments.filter(p => p.status === 'PENDING')
+    .reduce((total, p) => total.add(paise(p.amount, true)), new Decimal(0));
+  const available = Decimal.max(new Decimal(balance.outstanding).sub(pending), 0);
+  return { ...balance, pending: money(pending), availablePayment: money(available), canRecordPayment: available.gt(0) };
+}
+
 // Must run inside the same locked transaction that appends the recovery ledger entry.
 export function validateRecovery(
   advance: { status: string; issued: string; recovered: string },

@@ -31,6 +31,8 @@ interface Item {
   net: string;
   paid: string;
   outstanding: string;
+  pending: string;
+  availablePayment: string;
   status: string;
   components: Component[];
   adjustments: { id: string; type: string; amount: string; reason: string }[];
@@ -202,6 +204,8 @@ export default function PayrollDetails() {
               "Net",
               "Paid",
               "Outstanding",
+              "Pending confirmation",
+              "Available for payment",
               "Settlement",
             ]}
             rows={items.map((i) => [
@@ -213,6 +217,8 @@ export default function PayrollDetails() {
               i.net,
               i.paid,
               i.outstanding,
+              i.pending,
+              i.availablePayment,
               <Status key="s" value={i.status} />,
             ])}
           />

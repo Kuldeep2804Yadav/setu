@@ -318,10 +318,20 @@ describe.sequential("MongoDB Phase 3 transactional workflow", () => {
     ).toBe("1000.00");
   });
   it("confirms partial payments manually and creates acknowledgment receipts", async () => {
+    const before = await service.payrollDetail(owner, periodId);
+    expect(before.items[0]).toMatchObject({ outstanding: '1000.00', pending: '300.00', availablePayment: '700.00', canRecordPayment: true });
+    const listing = await service.listFinance(owner, 'payroll', { page: 1, limit: 100, workerId });
+    const listed = listing.data.find(p => p.id === periodId) as unknown as { items: { pending: string; availablePayment: string }[] };
+    expect(listed.items[0]).toMatchObject({ pending: '300.00', availablePayment: '700.00' });
+    const pending = await mutate('pendingCancellationRegression', tx => service.createPayment(tx, owner, { payrollItemId: itemId, amount: '100', date: '2026-02-03', method: 'CASH', reference: 'PENDING-CANCEL-REGRESSION' }));
+    expect((await service.payrollDetail(owner, periodId)).items[0].availablePayment).toBe('600.00');
+    await mutate('cancelPendingRegression', tx => service.paymentAction(tx, owner, pending.id, 'cancel', 'Cancel pending reservation regression'));
+    expect((await service.payrollDetail(owner, periodId)).items[0].availablePayment).toBe('700.00');
     const payment = await mutate("confirmPayment", (tx) =>
       service.paymentAction(tx, owner, paymentId, "confirm"),
     );
     expect(payment.confirmation).toBe("MANUALLY_CONFIRMED");
+    expect((await service.payrollDetail(owner, periodId)).items[0]).toMatchObject({ pending: '0.00', availablePayment: '700.00' });
     expect(
       (await service.payrollDetail(owner, periodId)).items[0].outstanding,
     ).toBe("700.00");
@@ -523,6 +533,15 @@ describe.sequential("MongoDB Phase 3 transactional workflow", () => {
     expect(report.totals.wageExpense).toBe('0.00');
     const siteReport=await reports.financialReport(owner,'site-cost',{page:1,limit:100,siteId});
     expect(siteReport.totals.advanceOutstanding).toBe('700.00');
+  });
+  it('limits returned payroll items to the selected worker in a multi-worker payroll',async()=>{
+    const other = await db.worker.create({data:{organizationId:owner.organizationId,code:'WRK-FILTER-2',name:'Other payment worker',normalizedName:'other payment worker',trade:'Mason'}});
+    for (const targetWorker of [workerId,other.id]) await mutate(`workerFilterBonus-${targetWorker}`,tx=>service.createAdjustment(tx,owner,{workerId:targetWorker,siteId:site2,date:'2026-06-01',amount:'100',type:'BONUS',reason:'Authorized bonus for worker filter regression'}));
+    const mixed = await mutate('workerFilterPayroll',tx=>service.savePayroll(tx,owner,{...input(),startDate:'2026-06-01',endDate:'2026-06-01'}));
+    expect(mixed.items).toHaveLength(2);
+    const listing = await service.listFinance(owner,'payroll',{page:1,limit:100,workerId:other.id});
+    const selected=listing.data.find(p=>p.id===mixed.id) as unknown as {items:{workerId:string}[]};
+    expect(selected.items).toHaveLength(1);expect(selected.items[0].workerId).toBe(other.id);
   });
   it('integrates exact period rates, approved leave and overtime supplements through HTTP',async()=>{
     const token=randomUUID();await db.session.create({data:{organizationId:owner.organizationId,userId:owner.id,token:createHash('sha256').update(token).digest('hex'),expiresAt:new Date(Date.now()+600000)}});
